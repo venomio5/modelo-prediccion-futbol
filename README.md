@@ -1,24 +1,84 @@
-# ⚽ Soccer Prediction Model
+# Advanced Soccer Forecasting Model
 
-The primary incentive behind this project was to get an **edge** in sports trading. A repeatable, quantifiable advantage over the market.
+In sports betting, bookmakers odds are shaped by public betting biases (heavy favoritism toward well-known teams), liquidity-driven price discovery, and a built-in margin (vig). This frequently creates persistent inefficiencies where the **true probability** of match outcomes diverges from the market’s implied probabilities. The goal was to develop a repeatable, quantifiable edge over the market that did not rely on subjective intuition or game-watching, but instead on an objective algorithmic approach. This was driven by the desire to identify mispriced opportunities in high-liquidity markets (1X2, Over/Under 2.5, Asian Handicap, etc.) in a sport known for high randomness, where even post-match Expected Goals (xG) explains only ~20% of actual goal variance.
 
-That edge would not come from intuition or watching games. It would come from an **algorithmic model** that estimates the true probability of a match outcome, independent of bookmaker pricing.
+---
 
-So I built one.
+## Algorithm Architecture
 
-This repository outlines the current architecture with explicit examples accompanying each component, and how the model performed to the single goal of finding value where the market is wrong.
+I built a three-phase pipeline that turns chaotic raw data into a calibrated “fair line” for every match. The architecture is deliberately transparent at the conceptual level while keeping the exact proprietary algorithms confidential.
 
-To read more about how the algortihmic model was built and few examples, go [here](methodology.md).
+### Phase 1: Data Gathering
 
-Now, for the results, I focused on;
+Data quality determines everything, as “garbage in, garbage out”. For that reason, I created a fully automated, multi-stage scraping and cleaning system centered on various sources.
 
-- **Expected Goals (xG):**  The model learned from Expected Goals (xG); by comparing its forecast to the actual xG generated in a match, we can validate the accuracy of its foundational building blocks.
-- **Probability:** Monte Carlo simulations translate xG into match odds, revealing where the market's pricing diverges from the model's calculated reality.
-- **Profitability:** Backtesting against market odds determines whether the edge identified in the probabilities translates into actual returns.
+* **Infrastructure Layer** : For every league, I first collect semi-permanent team data: GPS coordinates of stadiums (for precise travel-distance calculations), elevation above sea level (to model altitude effects), and the full season schedule.
+* **Match-Level Event Data** : For every single match I programmatically scrape:
+  * Final score, date, competition, home/away designation.
+  * Complete lineups (starting XI + every substitute and minute entered).
+  * Minute-by-minute event log: goals (scorer + assister), every shot (on/off target, blocked), yellow/red cards (with exact minute), and available weather conditions at kick-off.
+* **Cleaning & Unification Engine** (the most time-intensive step):
+  * Robust player-name normalization and disambiguation (accents, short forms, full legal names).
+  * Generation of persistent, lifelong Player IDs so every performance across seasons and leagues is linked to the same individual.
+  * Automated validation suite (minute aggregation ≈ 90–95 min per team, scoreline consistency, duplicate detection, etc.).
+  * Full relational linking: travel distance, rest days, red-card timing, etc.
 
-## Expected Goals (xG)
+The result is a clean, interconnected historical database where every player action is contextualized and traceable.
 
-### Performance Against Expected Goals
+### Phase 2: Data Processing & Modeling
+
+Two sequential modeling stages turn raw player performances into context-aware xG projections.
+
+#### Player Impact Coefficients
+
+A purpose-built machine-learning model analyzes every player’s historical match data to learn two latent values per player:
+
+* **Offensive Coefficient** — contribution to team xG (shots, chance creation, progressive actions, etc.).
+* **Defensive Coefficient** — ability to suppress opponent xG (tackles, interceptions, blocks, pressure).
+
+These coefficients are matchup-aware: a high-offensive forward facing a low-defensive defender increases the attacking team’s projected output. This creates a dynamic “player library” that automatically adjusts for injuries, form changes, or squad rotation.
+
+![Alt text](https://file+.vscode-resource.vscode-cdn.net/d%3A/Kevin/Projects/soccer-prediction-analysis/assets/players_coef.png)
+
+#### Contextual Adjustment
+
+The baseline team strength (sum of active players’ coefficients) is then fed into a gradient-boosting model (XGBoost) that applies non-linear real-world adjustments. The model learns, for example, that offensive output is typically suppressed when:
+
+* Playing away from home (home advantage factor).
+* Long travel distance or high-altitude venue.
+* Fewer rest days than the opponent.
+* Playing with a numerical disadvantage after a red card (time-weighted).
+* Current scoreline creates tactical pressure (chasing vs protecting a lead).
+* Weather or referee tendencies (where data available).
+
+This produces final, context-adjusted xG projections for both teams before any ball is kicked.
+
+![Alt text](https://file+.vscode-resource.vscode-cdn.net/d%3A/Kevin/Projects/soccer-prediction-analysis/assets/context_proj.png)
+
+### Phase 3: Simulation & Output
+
+xG is not a final score — it is a rate parameter. I run a dynamic **Monte Carlo engine** (10,000 simulations per match) that treats the match as an evolving process:
+
+* Goal-scoring modeled as a stochastic process (higher xG → more high-quality chances on average).
+* Minute-by-minute / state-based dynamics (inspired by Markov-chain concepts): scoreline pressure changes team behavior, substitutes enter at expected times, red-card effects decay over remaining minutes.
+* Full game-state evolution: a team trailing by two goals shifts to a more attacking style, altering subsequent xG generation.
+
+![Alt text](https://file+.vscode-resource.vscode-cdn.net/d%3A/Kevin/Projects/soccer-prediction-analysis/assets/match_xg_timeline.png)
+
+After 10,000 full-match simulations, I aggregate the final scorelines to produce:
+
+* Exact probabilities for home win / draw / away win.
+* Over/Under 2.5, Both Teams to Score, Asian Handicap lines, Correct Score distribution, etc.
+
+This distribution is the model’s “fair line.” Any deviation from bookmaker odds represents a quantifiable edge.
+
+---
+
+## Results
+
+### Expected Goals (xG)
+
+#### Performance Against Expected Goals
 
 For context, a team's expected goals in a single match usually falls somewhere between *0.5* and *2.5*. The model posted an **MAE** *(Mean Absolute Error) *of **0.598**. In plain terms, when the model projects a team's xG for a match, it's typically off by about six-tenths of a goal. Given the range we're dealing with, that's a reasonable margin.
 
@@ -28,11 +88,11 @@ Now, there is the **RMSE** *(Root Mean Square Error)*, which works similarly to 
 
 ![Alt text](assets/rmse_mae_dif.png)
 
-The model against the xG had an R² score of **0.158. It means that** 
+The model against the xG had an R² score of **0.158. It means that**
 
 ![Alt text](assets/rscore_xg.png)
 
-### Performance Against Actual Goals
+#### Performance Against Actual Goals
 
 This is the ultimate test. The performance here has inevitably weaker results, as we move from predicting a relatively stable metric (xG) to predicting discrete, low-probability events heavily influenced by finishing ability, goalkeeping, and simply plain luck. By comparing the model's performance against actual goals with how well the post-match xG metric performs at the same task, we can get a clearer picture of both the model's capabilities and football's inherent unpredictability.
 
@@ -48,7 +108,7 @@ The R² score offers the most revealing comparison. Actual xG, despite being der
 
 ![Alt text](assets/model_xg_r2.png)
 
-## Probability
+### Probability
 
 With the model's core xG predictions validated, the next section is about how well do those predictions translate into match probabilities. After all, the financial edge I'm seeking doesn't come from accurately forecasting expected goals, it comes from identifying when the market's odds diverge from the true likelihood of an outcome. That requires probabilities that are not only accurate in isolation but also well-calibrated enough to act upon when compared against bookmaker pricing.
 
@@ -63,9 +123,9 @@ Before diving into the results, here's a quick look at the metrics I used to eva
 * **Brier Score**: This measures the accuracy of the predicted probabilities for binary outcomes (like Over 2.5 goals). If you predict something with high confidence and you’re right, that’s a small error. If you predict something with high confidence and you’re wrong, that’s a large error. Again, a score of 0 is perfect, 1 is the worst. A naive model that always predicts 50% for Over would score 0.25, anything below that indicates the model is better than random guessing.
 * **Calibration:** This answers the essential question: when the model says an event has a 40% chance of happening, does it actually occur about 40% of the time? The Expected Calibration Error (ECE) measures the average gap between predicted probabilities and actual frequencies. An ECE of 0.03 means that, on average, when the model predicts a certain probability, the actual outcome frequency is within 3 percentage points of that prediction. So if it predicts 40%, you can expect the true rate to be somewhere between 37-43%. For probability-based betting decisions, good calibration is essential—it ensures that any apparent edge against market odds is grounded in reality.
 
-### Performance Against Market Odds
+#### Performance Against Market Odds
 
-#### 1X2 Market Performance
+##### 1X2 Market Performance
 
 In the three-outcome match result market, the model posts a log loss of **1.0587**. While the market´s log loss is **1.0342**. Both the model and the market sit below the naive baseline of approximately 1.099, which tells us that both predictions are, on average, more accurate than random chance. The market's score is lower than the model's, and here's why: log loss rewards confident correct predictions. The 1X2 market is dominated by bets on favorites, people put their money on the team expected to win. When those favorites actually win, which they do more often than not, the market's confident predictions are rewarded with a lower log loss. The market is essentially being penalized less because it's confidently backing the outcomes that happen most frequently.
 
@@ -85,7 +145,7 @@ For a value-based trading strategy, this combination is actually ideal. The mode
 
 ![Alt text](assets/1x2_market_cal.png)
 
-#### Over/Under 2.5 Goals Performance
+##### Over/Under 2.5 Goals Performance
 
 In the binary Over/Under market, the model's log loss is **0.6789**. The naive baseline here, always predicting 50%, is 0.693. The model comes in below that, meaning it's making genuinely informative predictions about whether matches will exceed 2.5 goals. The market's log loss is **0.6820**, which is also below the baseline but slightly higher than the model's. Here, the model actually has the edge in log loss, meaning its confident predictions are slightly more accurate on average.
 
@@ -101,7 +161,7 @@ For calibration in this market, the model's ECE is **0.0349** and the market's i
 
 ![Alt text](assets/ou_market_cal.png)
 
-## Profitability
+### Profitability
 
 The transition from *accurate probabilities* to *profitable trading* represents the final and most unforgiving test. A model can demonstrate statistical validity across hundreds of matches, but all of that becomes irrelevant if those advantages cannot survive the friction of real-world betting markets, for example, the bookmaker's margin, the liquidity of the market, the bankroll management, etc.
 
@@ -112,7 +172,7 @@ To test the model's financial viability, I ran a full backtest starting with a *
 
 For stake sizing, I used the **Kelly Criterion** (a formula that tells you how much to bet based on your edge) with a fractional approach to manage risk. A confidence multiplier adjusted stakes upward when the model had better data on a match.
 
-### The Growth Curve
+#### The Growth Curve
 
 ![Alt text](assets/balance_ot.png)
 
@@ -122,7 +182,7 @@ The bankroll started at **$10K** and ended at  **$139K** , with total profit of 
 2. **The 92% drawdown:** From that $40K peak, the bankroll crashed to about  **$3K** . A *drawdown* means peak-to-trough drop. This one went below starting capital. If you were trading real money, this would be gut-check time. The strategy survived because fractional Kelly kept stakes small enough that a losing streak didn't wipe the account completely.
 3. **The grind:** After the low point, the bankroll settled into steady, consistent growth. No more spikes. Just disciplined upward movement.
 
-### Key Performance Metrics
+#### Key Performance Metrics
 
 Across more than 5,000 bets, the total amount wagered was approximately **$1.47M**, generating  **$129K in profit**, which equates to an  **8.76% ROI**, meaning the model made about **$9 in profit for every $100 wagered**.
 
@@ -134,7 +194,7 @@ The win rate was **31.86%**, with average odds of **10.78**. At those odds, the 
 
 ![Alt text](assets/profitfactor.png)
 
-### Simulation Analysis
+#### Simulation Analysis
 
 To test whether these results could be explained by luck, I ran **10k simulations** where the same bets were decided randomly based on the market's implied probabilities. If the model had no real edge, its results would sit somewhere in the middle of the simulation cloud.
 
@@ -144,7 +204,7 @@ The gray dots represent the 10k simulations. Most cluster around lower profit an
 
 The numbers confirm what the chart shows. The **Sharpe ratio per bet** was **0.05**, which is modest for individual bets. But aggregated across thousands of bets, the **portfolio Sharpe ratio** reached **3.48**. For context, a Sharpe ratio above 1 is good, above 2 is excellent, and above 3 is exceptional in traditional finance. The **p-value** of **0.0013** means that if the model had no true edge, we would expect results this good by chance only 13 times out of 10,000 attempts.
 
-### Expected Value vs. Realized Profit
+#### Expected Value vs. Realized Profit
 
 If the model's probability estimates are accurate, higher expected value before matches should translate into higher profits over time.
 
@@ -152,7 +212,7 @@ If the model's probability estimates are accurate, higher expected value before 
 
 The scatter plot shows this relationship. Most bets cluster in the **15% to 17% expected value** range, with typical winning profits aroun **$250**. As expected value increases, the potential profit range widens, but the central tendency shifts upward. Bets with higher expected value produced larger profits when they won. There is no pattern of high-EV bets systematically underperforming.
 
-### Performance by Market Type
+#### Performance by Market Type
 
 Different betting markets produced different results. Here is the breakdown:
 

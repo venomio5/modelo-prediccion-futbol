@@ -1,4 +1,4 @@
-# **Advanced Soccer Forecasting Model**
+# **Soccer Forecasting Model**
 
 ## **Overview**
 

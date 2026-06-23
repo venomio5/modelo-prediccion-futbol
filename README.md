@@ -1,15 +1,18 @@
 # **Modelo de Predicción de Fútbol**
 
-## **Resumen**
+Este proyecto nació de la intuición de que el mercado de apuestas no refleja con precisión lo que realmente ocurre dentro de un partido de fútbol. Para explotar esa ineficiencia, se construyó un pipeline algorítmico de principio a fin que genera “líneas justas” calibradas y las compara con las cuotas de las casas de apuestas en mercados de alta liquidez (1X2, Over/Under 2.5, Asian Handicap, entre otros).
+En esencia, se toma un partido con todas sus variables (jugadores, contexto, dinámica del juego) y se traduce a una simulación Monte Carlo que corre el encuentro miles de veces para obtener probabilidades exactas de cada resultado. Esas probabilidades, cuando difieren de las cuotas de mercado, representan una ventaja medible.
 
-Este proyecto construye un pipeline algorítmico de principio a fin para identificar cuotas mal valoradas (mispriced odds) en mercados de apuestas de fútbol con alta liquidez. En lugar de depender de la intuición o de análisis subjetivos, el objetivo fue desarrollar una ventaja (edge) medible y basada en datos, generando "líneas justas" (fair lines) calibradas y comparándolas contra los precios de las casas de apuestas en mercados como 1X2, Over/Under 2.5, Asian Handicap, entre otros.
+## Estructura del repositorio
 
-## **Hallazgos Principales (Key Findings)**
+```
+├── assets/          # Gráficos e imágenes del análisis
+├── data/            # Datos utilizados en los notebooks (muestra o agregados)
+├── notebooks/       # Notebooks con visualizaciones y resultados del backtest
+├── .gitignore
+└── README.md
+```
 
-* Las proyecciones pre-partido de xG del modelo logran un MAE de **0.847**, quedando a solo **0.061 goles** de la precisión del xG post-partido, a pesar de no tener acceso a datos reales de tiros.
-* Las estimaciones de probabilidad están **mejor calibradas** que las cuotas del mercado, tanto en 1X2 (ECE 0.029 vs 0.039) como en Over/Under 2.5 (ECE 0.035 vs 0.039).
-* Un backtest de 6 meses con más de 5,000 apuestas generó un **rendimiento del 8.76%** (ganancias entre el total apostado), un **crecimiento de balance del 1,294%** (si hubiera liquidez), y un Sharpe ratio en el portafolio de **3.48** (métrica que indica un excelente ajuste de riesgo-recompensa, al medir el rendimiento extra generado por cada unidad de volatilidad).
-* Los mercados de Asian Handicap y Over/Under 2.5 fueron los más rentables. El Correct Score produjo retornos negativos a pesar del alto volumen de apuestas.
-* Un estudio de simulación (10,000 corridas aleatorias) confirma que los resultados no son producto del azar, obteniendo un **p-value de 0.0013**.
+> **Nota importante:** Este repositorio público muestra únicamente los resultados y algunas visualizaciones. El código fuente del modelo, los algoritmos de machine learning y la implementación completa se encuentran en un repositorio privado. Por su naturaleza como modelo en producción, se mantiene confidencial.
 
-Para ver la historia completa, gráficos, la metodología de negocio y un desglose total del rendimiento → revisa la **[Página de Notion](https://www.notion.so/Advanced-Soccer-Forecasting-Model-322b7682d7a780b7a49ac85b794058a8)**.
+El desglose total de la metodología, los análisis de rendimiento, gráficos interactivos y la historia detrás del proyecto están disponibles en la pagina de **[Notion](https://www.notion.so/Advanced-Soccer-Forecasting-Model-322b7682d7a780b7a49ac85b794058a8)**.
